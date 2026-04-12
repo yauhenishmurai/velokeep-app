@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Bike, Settings, Activity, Plus, AlertTriangle, CheckCircle, ChevronRight, 
   Search, RefreshCw, Trash2, Loader2, LayoutGrid, History, ExternalLink, 
-  ListPlus, FileText, Sparkles, Globe, Lock, LogOut, Users, Calendar, X
+  ListPlus, FileText, Sparkles, Globe, Lock, LogOut, Users, Calendar, X, Pencil
 } from 'lucide-react';
 
 // --- FIREBASE ИМПОРТЫ ---
@@ -28,7 +28,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // --- ИИ ПОМОЩНИК ---
 const callGemini = async (prompt, jsonSchema = null) => {
-  const apiKey = ""; // Вставь свой API ключ Gemini сюда, когда он появится
+  const apiKey = ""; // Вставь свой API ключ Gemini
   if (!apiKey) return "ИИ-советник пока отключен (нет API ключа).";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -44,20 +44,27 @@ const callGemini = async (prompt, jsonSchema = null) => {
   }
 };
 
-// --- FALLBACK БАЗЫ (ДЛЯ ПАРСИНГА И АНАЛОГОВ) ---
+// --- БАЗА "ЭКСПЕРТ-МЕХАНИК" ---
 const bikeDatabase = {
   "racer alpina man 1.0": {
-    type: "Hybrid/City", photo: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=800",
+    type: "City/Hybrid", photo: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=800",
     components: [
-      { category: 'Рама', type: 'Рама', name: "Алюминий", lifespan: 50000 },
-      { category: 'Подвеска', type: 'Вилка', name: "Амортизационная пружинная", lifespan: 1500 },
-      { category: 'Колеса', type: 'Покрышки', name: "Wanda 700x40C", lifespan: 4000 },
-      { category: 'Трансмиссия', type: 'Трещотка', name: "Shimano MF-TZ500", lifespan: 6000 },
-      { category: 'Трансмиссия', type: 'Цепь', name: "KMC Z7", lifespan: 1500 },
-      { category: 'Трансмиссия', type: 'Система', name: "Prowheel 42/34/24T", lifespan: 15000 },
-      { category: 'Трансмиссия', type: 'Переключатель (зад)', name: "Shimano Tourney", lifespan: 8000 },
-      { category: 'Трансмиссия', type: 'Каретка', name: "Картридж под квадрат", lifespan: 10000 },
-      { category: 'Тормозная система', type: 'Колодки', name: "Дисковые ZOOM", lifespan: 1500 }
+      { category: 'Рама и Вилка', type: 'Рама', name: "Алюминиевая рама", article: "BSA 68mm, 135mm QR", lifespan: 50000 },
+      { category: 'Рама и Вилка', type: 'Вилка', name: "Амортизационная пружинная", article: "1-1/8 straight, 100mm QR", lifespan: 1500 },
+      { category: 'Колеса', type: 'Втулка (пер)', name: "Joytech", article: "Насыпные подшипники, 100mm QR, 6 болтов", lifespan: 5000 },
+      { category: 'Колеса', type: 'Втулка (зад)', name: "Joytech", article: "Насыпные подшипники, 135mm QR, 6 болтов, под трещотку", lifespan: 5000 },
+      { category: 'Колеса', type: 'Покрышка (пер)', name: "Wanda", article: "700x40C", lifespan: 6000 },
+      { category: 'Колеса', type: 'Покрышка (зад)', name: "Wanda", article: "700x40C", lifespan: 3500 },
+      { category: 'Трансмиссия', type: 'Трещотка', name: "Shimano MF-TZ500", article: "7 скоростей, 14-28T", lifespan: 6000 },
+      { category: 'Трансмиссия', type: 'Цепь', name: "KMC Z7", article: "7 скоростей", lifespan: 1500 },
+      { category: 'Трансмиссия', type: 'Система шатунов', name: "Prowheel", article: "42/34/24T, под квадрат", lifespan: 15000 },
+      { category: 'Трансмиссия', type: 'Переключатель (зад)', name: "Shimano Tourney", article: "7 ск, Long cage", lifespan: 8000 },
+      { category: 'Трансмиссия', type: 'Переключатель (пер)', name: "Shimano Tourney", article: "3 ск, 31.8mm clamp", lifespan: 8000 },
+      { category: 'Трансмиссия', type: 'Каретка', name: "Картридж", article: "BSA 68mm, под квадрат", lifespan: 10000 },
+      { category: 'Тормозная система', type: 'Колодки (пер)', name: "ZOOM Дисковые механика", article: "Аналог B01S", lifespan: 1500 },
+      { category: 'Тормозная система', type: 'Колодки (зад)', name: "ZOOM Дисковые механика", article: "Аналог B01S", lifespan: 1500 },
+      { category: 'Управление', type: 'Руль', name: "Стальной Riser", article: "31.8mm", lifespan: 0 },
+      { category: 'Управление', type: 'Подседельный штырь', name: "Алюминий", article: "27.2mm", lifespan: 0 }
     ]
   }
 };
@@ -176,7 +183,7 @@ function MainApp({ user }) {
       date: dateStr, 
       type: 'ride',
       text: `Заезд: ${distNum} км` + (notes ? `\nЗаметка: ${notes}` : ''),
-      timestamp: Date.now() // Системное время создания для доп. сортировки
+      timestamp: Date.now()
     });
   };
 
@@ -206,8 +213,8 @@ function MainApp({ user }) {
       name: compData.name,
       category: compData.category || 'Дополнительно',
       type: compData.type || 'Узел',
+      article: compData.article || '',
       installDate: new Date().toISOString().split('T')[0],
-      // Вычисляем пробег установки так, чтобы сымитировать износ
       installMileage: activeBike.totalMileage - (parseFloat(compData.currentWorn) || 0),
       lifespan: parseFloat(compData.lifespan) || 0,
       archived: false
@@ -230,6 +237,7 @@ function MainApp({ user }) {
       name: newItemDetails.name || oldComp.name,
       category: oldComp.category,
       type: oldComp.type,
+      article: newItemDetails.article !== undefined ? newItemDetails.article : oldComp.article,
       installDate: new Date().toISOString().split('T')[0],
       installMileage: activeBike.totalMileage,
       lifespan: newItemDetails.lifespan || oldComp.lifespan,
@@ -244,6 +252,10 @@ function MainApp({ user }) {
       text: `Замена "${newItemDetails.name || oldComp.name}" на пробеге ${Math.round(activeBike.totalMileage)} км`,
       timestamp: Date.now()
     });
+  };
+
+  const handleEditComponent = async (compId, updatedData) => {
+    await updateDoc(doc(db, "components", compId), updatedData);
   };
 
   const handleDeleteBike = async (bikeId) => {
@@ -292,7 +304,6 @@ function MainApp({ user }) {
             bike={activeBike} 
             alerts={activeComponentsWithWear.filter(c => c.status !== 'good')} 
             components={activeComponentsWithWear} 
-            // Сортируем журнал сначала по дате заезда, затем по времени создания
             logs={logs.filter(l => l.bikeId === activeBike.id).sort((a,b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp)} 
             onAddRide={handleAddRide} 
           />
@@ -303,7 +314,12 @@ function MainApp({ user }) {
         )}
         
         {activeTab === 'details' && activeBike && (
-          <ComponentsTab components={activeComponentsWithWear} onReplace={handleQuickReplace} onAddNew={handleAddNewManualComponent} />
+          <ComponentsTab 
+            components={activeComponentsWithWear} 
+            onReplace={handleQuickReplace} 
+            onAddNew={handleAddNewManualComponent} 
+            onEdit={handleEditComponent}
+          />
         )}
 
         {activeTab === 'public' && (
@@ -322,7 +338,7 @@ function MainApp({ user }) {
 function PublicParkingTab({ currentUserId }) {
   const [publicBikes, setPublicBikes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewBike, setViewBike] = useState(null); // Состояние для просмотра чужого байка
+  const [viewBike, setViewBike] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, "bikes"), where("isPublic", "==", true));
@@ -359,10 +375,7 @@ function PublicParkingTab({ currentUserId }) {
                 <div className="text-xs text-slate-500 uppercase font-semibold">Заявленный пробег</div>
                 <div className="text-xl font-bold text-slate-200">{Math.round(bike.totalMileage)} км</div>
               </div>
-              <button 
-                onClick={() => setViewBike(bike)} 
-                className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-bold transition-colors text-sm flex items-center gap-2"
-              >
+              <button onClick={() => setViewBike(bike)} className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-bold transition-colors text-sm flex items-center gap-2">
                 <Search className="w-4 h-4" /> Просмотр
               </button>
             </div>
@@ -383,34 +396,27 @@ function PublicBikeViewModal({ bike, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Получаем узлы этого велосипеда
     const qComps = query(collection(db, "components"), where("bikeId", "==", bike.id));
-    const unsubComps = onSnapshot(qComps, snap => {
-      setComponents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsubComps = onSnapshot(qComps, snap => setComponents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // Получаем логи этого велосипеда
     const qLogs = query(collection(db, "logs"), where("bikeId", "==", bike.id));
     const unsubLogs = onSnapshot(qLogs, snap => {
       setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false); // Снимаем лоадер, когда загрузились данные
+      setLoading(false);
     });
 
     return () => { unsubComps(); unsubLogs(); };
   }, [bike.id]);
 
-  // Математика износа (только чтение)
   const componentsWithWear = useMemo(() => {
-    return components
-      .filter(c => !c.archived)
-      .map(comp => {
-        const distanceSinceInstall = bike.totalMileage - comp.installMileage;
-        let wearPercentage = comp.lifespan > 0 ? (distanceSinceInstall / comp.lifespan) * 100 : 0;
-        let status = 'good';
-        if (wearPercentage >= 100) status = 'critical';
-        else if (wearPercentage >= 75) status = 'warning';
-        return { ...comp, distanceSinceInstall, wearPercentage, status };
-      });
+    return components.filter(c => !c.archived).map(comp => {
+      const distanceSinceInstall = bike.totalMileage - comp.installMileage;
+      let wearPercentage = comp.lifespan > 0 ? (distanceSinceInstall / comp.lifespan) * 100 : 0;
+      let status = 'good';
+      if (wearPercentage >= 100) status = 'critical';
+      else if (wearPercentage >= 75) status = 'warning';
+      return { ...comp, distanceSinceInstall, wearPercentage, status };
+    });
   }, [components, bike.totalMileage]);
 
   const sortedLogs = [...logs].sort((a,b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp);
@@ -418,7 +424,6 @@ function PublicBikeViewModal({ bike, onClose }) {
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-indigo-500/50 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Шапка модалки */}
         <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950 shrink-0">
           <div>
             <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
@@ -431,9 +436,7 @@ function PublicBikeViewModal({ bike, onClose }) {
           </button>
         </div>
 
-        {/* Тело модалки */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
-          {/* Фото */}
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
             <div className="h-40 md:h-48 relative">
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent z-10" />
@@ -449,7 +452,6 @@ function PublicBikeViewModal({ bike, onClose }) {
              <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
           ) : (
             <div className="grid lg:grid-cols-2 gap-6">
-              {/* Узлы (Только чтение) */}
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-white">Текущее состояние</h2>
                 <div className="bg-slate-950 rounded-xl border border-slate-800 divide-y divide-slate-800/50">
@@ -460,7 +462,8 @@ function PublicBikeViewModal({ bike, onClose }) {
                       <div key={c.id} className="p-4 flex justify-between items-center">
                         <div className="pr-2">
                           <div className="font-bold text-white text-sm leading-tight">{c.name}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{c.category} • {c.type}</div>
+                          <div className="text-[10px] text-indigo-400 font-mono mt-0.5">{c.article || 'Нет спецификации'}</div>
+                          <div className="text-xs text-slate-500 mt-1">{c.category} • {c.type}</div>
                         </div>
                         <div className="w-1/3 text-right shrink-0">
                           <div className={`text-sm font-bold ${c.status === 'critical' ? 'text-red-500' : 'text-slate-300'}`}>{Math.round(c.wearPercentage)}%</div>
@@ -472,7 +475,6 @@ function PublicBikeViewModal({ bike, onClose }) {
                 </div>
               </div>
 
-              {/* История (Только чтение) */}
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-indigo-400"/> Бортовой журнал</h2>
                 <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 max-h-[500px] overflow-y-auto custom-scrollbar">
@@ -575,6 +577,7 @@ function AddBikeModal({ onClose, onSave }) {
         category: comp.category,
         type: comp.type || comp.name.split(' ')[0],
         name: comp.name,
+        article: comp.article || '',
         lifespan: comp.lifespan,
         currentWornMileage: 0 
       }));
@@ -591,27 +594,27 @@ function AddBikeModal({ onClose, onSave }) {
     let parsedComponents = [];
 
     const addComp = (cat, type, name, ls) => {
-      parsedComponents.push({ category: cat, type: type, name: name, lifespan: ls, currentWornMileage: 0, id: `tmp_${Math.random()}` });
+      parsedComponents.push({ category: cat, type: type, name: name, article: '', lifespan: ls, currentWornMileage: 0, id: `tmp_${Math.random()}` });
     };
 
-    if (/Рама/i.test(text)) addComp('Рама', 'Рама', 'Рама', 50000);
-    if (/Вилка|Амортизац/i.test(text)) addComp('Подвеска', 'Вилка', 'Амортизационная вилка', 1500);
-    if (/Втулки|Обода/i.test(text)) addComp('Колеса', 'Втулки', 'Втулки', 5000);
-    if (/Покрышки|Шины|700x/i.test(text)) addComp('Колеса', 'Покрышки', 'Покрышки', 4000);
-    if (/Трещотка|Кассета/i.test(text)) addComp('Трансмиссия', 'Трещотка/Кассета', 'Блок задних звезд', 6000);
+    if (/Рама/i.test(text)) addComp('Рама и Вилка', 'Рама', 'Рама', 50000);
+    if (/Вилка|Амортизац/i.test(text)) addComp('Рама и Вилка', 'Вилка', 'Амортизационная вилка', 1500);
+    if (/Втулки|Обода/i.test(text)) { addComp('Колеса', 'Втулка (пер)', 'Втулка передняя', 5000); addComp('Колеса', 'Втулка (зад)', 'Втулка задняя', 5000); }
+    if (/Покрышки|Шины|700x/i.test(text)) { addComp('Колеса', 'Покрышка (пер)', 'Покрышка', 6000); addComp('Колеса', 'Покрышка (зад)', 'Покрышка', 3500); }
+    if (/Трещотка|Кассета/i.test(text)) addComp('Трансмиссия', 'Кассета/Трещотка', 'Блок задних звезд', 6000);
     if (/Цепь|KMC/i.test(text)) addComp('Трансмиссия', 'Цепь', 'Цепь', 1500);
     if (/Система шатунов/i.test(text)) addComp('Трансмиссия', 'Система', 'Система шатунов', 15000);
     if (/Задний переключатель/i.test(text)) addComp('Трансмиссия', 'Переключатель (зад)', 'Задний переключатель', 8000);
-    if (/Передний переключатель/i.test(text)) addComp('Трансмиссия', 'Переключатель (пер)', 'Передний переключатель', 8000);
     if (/Манетки/i.test(text)) addComp('Управление', 'Манетки', 'Манетки', 10000);
-    if (/Тормоза|Колодки/i.test(text)) addComp('Тормозная система', 'Колодки', 'Тормозные колодки', 1500);
+    if (/Тормоза|Колодки/i.test(text)) { addComp('Тормозная система', 'Колодки (пер)', 'Колодки', 1500); addComp('Тормозная система', 'Колодки (зад)', 'Колодки', 1500); }
     if (/Каретка/i.test(text)) addComp('Трансмиссия', 'Каретка', 'Каретка', 10000);
 
     if (parsedComponents.length === 0) {
       addComp('Трансмиссия', 'Цепь', 'Цепь (базовая)', 2500);
       addComp('Трансмиссия', 'Кассета', 'Кассета', 5000);
-      addComp('Колеса', 'Покрышки', 'Покрышки', 4000);
-      addComp('Тормозная система', 'Колодки', 'Колодки', 1500);
+      addComp('Колеса', 'Покрышка (зад)', 'Покрышка', 3500);
+      addComp('Колеса', 'Покрышка (пер)', 'Покрышка', 6000);
+      addComp('Тормозная система', 'Колодки (пер)', 'Колодки', 1500);
     }
 
     setParsedData({ 
@@ -628,8 +631,15 @@ function AddBikeModal({ onClose, onSave }) {
     setIsParsingAi(true);
     
     try {
-      const prompt = `Проанализируй текст спецификации велосипеда и извлеки компоненты. 
-      Для каждого укажи: category (Трансмиссия, Тормозная система, Колеса, Подвеска, Рама, Управление), type (Цепь, Кассета, Покрышки, Вилка и т.д.), name (модель из текста), lifespan (примерный ресурс в км: Цепь 2000, Кассета 6000, Покрышки 4000, Колодки 1500, Рама 50000).
+      const prompt = `Ты — Эксперт Веломеханик и Архитектор Данных.
+      Проанализируй текст спецификации велосипеда и извлеки компоненты в JSON.
+      
+      СТРОГИЕ ПРАВИЛА:
+      1. Категории строго: Рама и Вилка, Трансмиссия, Колеса, Тормозная система, Управление, Аксессуары.
+      2. ОБЯЗАТЕЛЬНО разделяй парные детали на две отдельные записи: "Покрышка (пер)" и "Покрышка (зад)", "Колодки (пер)" и "Колодки (зад)", "Втулка (пер)" и "Втулка (зад)", "Ротор (пер)", "Ротор (зад)".
+      3. В поле article сохраняй ВСЕ стандарты и спецификации (например: BSA 68mm, Centerlock, 700x40c, 1-1/8, BCD 104, Hollowtech II). Если нет - оставь пустым.
+      4. Ресурсы (lifespan) в км: Рама 50000, Вилка 1500, Цепь 2000, Кассета 6000, Шатуны 15000, Передняя покрышка 6000, Задняя покрышка 3500, Колодки 1500, Роторы 8000, Тросы 3000.
+      
       Текст: ${pastedSpecs}`;
 
       const componentSchema = {
@@ -640,9 +650,10 @@ function AddBikeModal({ onClose, onSave }) {
             category: { type: "STRING" },
             type: { type: "STRING" },
             name: { type: "STRING" },
+            article: { type: "STRING" },
             lifespan: { type: "INTEGER" }
           },
-          required: ["category", "type", "name", "lifespan"]
+          required: ["category", "type", "name", "article", "lifespan"]
         }
       };
 
@@ -654,6 +665,7 @@ function AddBikeModal({ onClose, onSave }) {
           category: comp.category || 'Дополнительно',
           type: comp.type || 'Узел',
           name: comp.name || 'Неизвестно',
+          article: comp.article || '',
           lifespan: comp.lifespan || 2000,
           currentWornMileage: 0
         }));
@@ -701,6 +713,7 @@ function AddBikeModal({ onClose, onSave }) {
         name: comp.name,
         category: comp.category,
         type: comp.type,
+        article: comp.article || '',
         installDate: new Date().toISOString().split('T')[0],
         installMileage: calculatedInstallMileage,
         lifespan: Number(comp.lifespan),
@@ -786,7 +799,8 @@ function AddBikeModal({ onClose, onSave }) {
                 <div key={comp.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row gap-4 md:items-center">
                   <div className="flex-1">
                     <div className="text-xs text-lime-400 mb-1 font-semibold uppercase">{comp.category} • {comp.type}</div>
-                    <input type="text" value={comp.name} onChange={(e) => handleUpdateComponent(comp.id, 'name', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-lime-500 focus:outline-none font-bold" />
+                    <input type="text" value={comp.name} onChange={(e) => handleUpdateComponent(comp.id, 'name', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-lime-500 focus:outline-none font-bold mb-2" />
+                    <input type="text" value={comp.article} onChange={(e) => handleUpdateComponent(comp.id, 'article', e.target.value)} className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-1.5 text-indigo-300 font-mono text-[10px] md:text-xs focus:border-indigo-500 focus:outline-none" placeholder="Спецификации (напр. BSA 68mm, 700x40c)" />
                   </div>
                   
                   <div className="flex gap-3">
@@ -906,9 +920,10 @@ function DashboardTab({ bike, alerts, components, logs, onAddRide }) {
   );
 }
 
-// --- УЗЛЫ (С КНОПКОЙ РУЧНОГО ДОБАВЛЕНИЯ) ---
-function ComponentsTab({ components, onReplace, onAddNew }) {
+// --- УЗЛЫ (С КНОПКАМИ ДОБАВЛЕНИЯ И РЕДАКТИРОВАНИЯ) ---
+function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
   const [showAddNewModal, setShowAddNewModal] = useState(false);
+  const [compToEdit, setCompToEdit] = useState(null);
 
   const grouped = components.reduce((acc, comp) => {
     if (!acc[comp.category]) acc[comp.category] = [];
@@ -921,7 +936,7 @@ function ComponentsTab({ components, onReplace, onAddNew }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Контроль узлов</h1>
-          <p className="text-xs text-slate-400 mt-1">Детальный контроль износа и замена узлов</p>
+          <p className="text-xs text-slate-400 mt-1">Детальная настройка и замена компонентов</p>
         </div>
         <button onClick={() => setShowAddNewModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-lime-400 border border-slate-700 px-4 py-2.5 rounded-xl font-bold transition-colors text-sm">
           <ListPlus className="w-5 h-5" /> Добавить узел
@@ -934,9 +949,10 @@ function ComponentsTab({ components, onReplace, onAddNew }) {
              <div className="bg-slate-800/50 px-4 py-2 border-b border-slate-800 text-xs font-bold text-lime-400 uppercase tracking-wider">{category}</div>
              <div className="divide-y divide-slate-800/50">
                 {items.map(comp => (
-                  <div key={comp.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-slate-800/30 transition-colors">
+                  <div key={comp.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-slate-800/30 transition-colors group">
                     <div className="flex-1">
                       <div className="font-bold text-white text-base leading-tight">{comp.name}</div>
+                      {comp.article && <div className="text-[10px] md:text-xs text-indigo-400 font-mono mt-0.5">{comp.article}</div>}
                       <div className="text-xs text-slate-500 mt-1">{comp.type}</div>
                     </div>
                     <div className="w-full sm:w-1/3 md:w-1/4">
@@ -955,6 +971,11 @@ function ComponentsTab({ components, onReplace, onAddNew }) {
                        )}
                     </div>
                     <div className="flex justify-end gap-2 shrink-0 mt-2 sm:mt-0">
+                      {/* Кнопка РЕДАКТИРОВАТЬ */}
+                      <button onClick={() => setCompToEdit(comp)} className="p-2 md:opacity-0 group-hover:opacity-100 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all" title="Редактировать параметры">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {/* Кнопка ЗАМЕНА */}
                       <button onClick={() => onReplace(comp.id, {})} className="px-3 py-2 bg-lime-500 hover:bg-lime-400 text-slate-950 rounded-lg font-bold text-xs flex gap-1.5 items-center">
                         <RefreshCw className="w-3.5 h-3.5" /> Замена
                       </button>
@@ -967,41 +988,125 @@ function ComponentsTab({ components, onReplace, onAddNew }) {
       </div>
 
       {showAddNewModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-5">Новая деталь (вручную)</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              onAddNew({ name: formData.get('name'), category: formData.get('category'), lifespan: formData.get('lifespan'), currentWorn: formData.get('currentWorn') });
-              setShowAddNewModal(false);
-            }} className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Название детали</label>
-                <input type="text" name="name" required className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" placeholder="Напр: Левая манетка" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Категория</label>
-                <input type="text" name="category" required defaultValue="Дополнительно" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Ресурс (км)</label>
-                  <input type="number" name="lifespan" required min="0" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" placeholder="0 = бессрочно" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Уже прошел (км)</label>
-                  <input type="number" name="currentWorn" min="0" defaultValue="0" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button type="button" onClick={() => setShowAddNewModal(false)} className="flex-1 p-3 border border-slate-700 text-slate-300 rounded-xl hover:bg-slate-800 font-semibold">Отмена</button>
-                <button type="submit" className="flex-1 p-3 bg-lime-500 text-slate-950 font-bold rounded-xl hover:bg-lime-400">Добавить</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AddNewComponentModal onClose={() => setShowAddNewModal(false)} onAdd={onAddNew} />
       )}
+
+      {compToEdit && (
+        <EditComponentModal component={compToEdit} onClose={() => setCompToEdit(null)} onSave={(updated) => { onEdit(compToEdit.id, updated); setCompToEdit(null); }} />
+      )}
+    </div>
+  );
+}
+
+// МОДАЛКА РЕДАКТИРОВАНИЯ СУЩЕСТВУЮЩЕГО УЗЛА
+function EditComponentModal({ component, onClose, onSave }) {
+  const [name, setName] = useState(component.name);
+  const [article, setArticle] = useState(component.article || '');
+  const [category, setCategory] = useState(component.category);
+  const [type, setType] = useState(component.type);
+  const [lifespan, setLifespan] = useState(component.lifespan);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ name, article, category, type, lifespan: Number(lifespan) });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-2"><Pencil className="w-5 h-5 text-lime-500"/> Изменить узел</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Категория • Тип детали</label>
+            <div className="flex gap-2">
+              <input type="text" value={category} onChange={e=>setCategory(e.target.value)} required className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-lime-500 focus:outline-none" />
+              <input type="text" value={type} onChange={e=>setType(e.target.value)} required className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-lime-500 focus:outline-none" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Название детали</label>
+            <input type="text" value={name} onChange={e=>setName(e.target.value)} required className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white font-bold focus:border-lime-500 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Стандарты / Интерфейс (опционально)</label>
+            <input type="text" value={article} onChange={e=>setArticle(e.target.value)} className="w-full bg-slate-950 border border-indigo-500/30 rounded-xl p-3 text-indigo-300 font-mono text-sm focus:border-indigo-500 focus:outline-none" placeholder="BSA 68mm, 700x40c, Centerlock" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Заявленный ресурс (км)</label>
+            <input type="number" value={lifespan} onChange={e=>setLifespan(e.target.value)} required min="0" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-lime-400 font-mono focus:border-lime-500 focus:outline-none" />
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button type="button" onClick={onClose} className="flex-1 p-3 border border-slate-700 text-slate-300 rounded-xl hover:bg-slate-800 font-semibold">Отмена</button>
+            <button type="submit" className="flex-1 p-3 bg-lime-500 text-slate-950 font-bold rounded-xl hover:bg-lime-400">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// МОДАЛКА НОВОЙ ДЕТАЛИ
+function AddNewComponentModal({ onClose, onAdd }) {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    onAdd({ 
+      name: formData.get('name'), 
+      article: formData.get('article'), 
+      category: formData.get('category'), 
+      type: formData.get('type'), 
+      lifespan: formData.get('lifespan'), 
+      currentWorn: formData.get('currentWorn') 
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
+        <h3 className="text-xl font-bold text-white mb-5">Добавление узла</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Категория</label>
+              <select name="category" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-lime-500 focus:outline-none">
+                <option value="Трансмиссия">Трансмиссия</option>
+                <option value="Колеса">Колеса</option>
+                <option value="Тормозная система">Тормозная система</option>
+                <option value="Рама и Вилка">Рама и Вилка</option>
+                <option value="Управление">Управление</option>
+                <option value="Аксессуары">Аксессуары</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Тип узла</label>
+              <input type="text" name="type" required className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-lime-500 focus:outline-none" placeholder="Покрышка (зад)" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Название детали</label>
+            <input type="text" name="name" required className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white font-bold focus:border-lime-500 focus:outline-none" placeholder="Continental Terra Speed" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Стандарты / Интерфейс (опц.)</label>
+            <input type="text" name="article" className="w-full bg-slate-950 border border-indigo-500/30 rounded-xl p-3 text-indigo-300 font-mono text-sm focus:border-indigo-500 focus:outline-none" placeholder="700x40c, Tubeless" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ресурс (км)</label>
+              <input type="number" name="lifespan" required min="0" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" placeholder="0 = бессрочно" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Уже прошел (км)</label>
+              <input type="number" name="currentWorn" min="0" defaultValue="0" className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-lime-500 focus:outline-none" />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button type="button" onClick={onClose} className="flex-1 p-3 border border-slate-700 text-slate-300 rounded-xl hover:bg-slate-800 font-semibold">Отмена</button>
+            <button type="submit" className="flex-1 p-3 bg-lime-500 text-slate-950 font-bold rounded-xl hover:bg-lime-400">Добавить</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
