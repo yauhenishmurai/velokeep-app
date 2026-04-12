@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Bike, Settings, Activity, Plus, AlertTriangle, CheckCircle, ChevronRight, 
   Search, RefreshCw, Trash2, Loader2, LayoutGrid, History, ExternalLink, 
-  ListPlus, FileText, Sparkles, Globe, Lock, LogOut, Users, Calendar
+  ListPlus, FileText, Sparkles, Globe, Lock, LogOut, Users, Calendar, X
 } from 'lucide-react';
 
 // --- FIREBASE ИМПОРТЫ ---
@@ -322,6 +322,7 @@ function MainApp({ user }) {
 function PublicParkingTab({ currentUserId }) {
   const [publicBikes, setPublicBikes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewBike, setViewBike] = useState(null); // Состояние для просмотра чужого байка
 
   useEffect(() => {
     const q = query(collection(db, "bikes"), where("isPublic", "==", true));
@@ -358,11 +359,148 @@ function PublicParkingTab({ currentUserId }) {
                 <div className="text-xs text-slate-500 uppercase font-semibold">Заявленный пробег</div>
                 <div className="text-xl font-bold text-slate-200">{Math.round(bike.totalMileage)} км</div>
               </div>
-              <button disabled className="px-4 py-2 bg-slate-800 text-slate-400 rounded-xl cursor-not-allowed text-sm">Просмотр (скоро)</button>
+              <button 
+                onClick={() => setViewBike(bike)} 
+                className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-bold transition-colors text-sm flex items-center gap-2"
+              >
+                <Search className="w-4 h-4" /> Просмотр
+              </button>
             </div>
           </div>
         ))}
         {publicBikes.length === 0 && <div className="col-span-2 text-center py-10 text-slate-500">Пока никто не припарковал здесь свой велосипед. Будь первым!</div>}
+      </div>
+
+      {viewBike && <PublicBikeViewModal bike={viewBike} onClose={() => setViewBike(null)} />}
+    </div>
+  );
+}
+
+// --- МОДАЛКА ПРОСМОТРА ЧУЖОГО БАЙКА ---
+function PublicBikeViewModal({ bike, onClose }) {
+  const [components, setComponents] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Получаем узлы этого велосипеда
+    const qComps = query(collection(db, "components"), where("bikeId", "==", bike.id));
+    const unsubComps = onSnapshot(qComps, snap => {
+      setComponents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // Получаем логи этого велосипеда
+    const qLogs = query(collection(db, "logs"), where("bikeId", "==", bike.id));
+    const unsubLogs = onSnapshot(qLogs, snap => {
+      setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false); // Снимаем лоадер, когда загрузились данные
+    });
+
+    return () => { unsubComps(); unsubLogs(); };
+  }, [bike.id]);
+
+  // Математика износа (только чтение)
+  const componentsWithWear = useMemo(() => {
+    return components
+      .filter(c => !c.archived)
+      .map(comp => {
+        const distanceSinceInstall = bike.totalMileage - comp.installMileage;
+        let wearPercentage = comp.lifespan > 0 ? (distanceSinceInstall / comp.lifespan) * 100 : 0;
+        let status = 'good';
+        if (wearPercentage >= 100) status = 'critical';
+        else if (wearPercentage >= 75) status = 'warning';
+        return { ...comp, distanceSinceInstall, wearPercentage, status };
+      });
+  }, [components, bike.totalMileage]);
+
+  const sortedLogs = [...logs].sort((a,b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp);
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-indigo-500/50 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        {/* Шапка модалки */}
+        <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950 shrink-0">
+          <div>
+            <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+              <Globe className="w-5 h-5 text-indigo-400" /> {bike.name}
+            </h3>
+            <p className="text-slate-400 text-sm">Владелец: {bike.authorName || 'Аноним'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors shrink-0">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Тело модалки */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
+          {/* Фото */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+            <div className="h-40 md:h-48 relative">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent z-10" />
+              <img src={bike.photo} alt={bike.name} className="w-full h-full object-cover opacity-60" />
+              <div className="absolute bottom-4 left-6 z-20">
+                <p className="text-indigo-300 text-sm font-semibold mb-1">{bike.model}</p>
+                <p className="text-white text-xl md:text-2xl font-bold">Пробег: <span className="text-lime-400">{Math.round(bike.totalMileage)} км</span></p>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+             <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Узлы (Только чтение) */}
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-white">Текущее состояние</h2>
+                <div className="bg-slate-950 rounded-xl border border-slate-800 divide-y divide-slate-800/50">
+                  {componentsWithWear.length === 0 ? (
+                    <div className="p-6 text-slate-500 text-sm text-center">Нет данных об узлах</div>
+                  ) : (
+                    componentsWithWear.map(c => (
+                      <div key={c.id} className="p-4 flex justify-between items-center">
+                        <div className="pr-2">
+                          <div className="font-bold text-white text-sm leading-tight">{c.name}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{c.category} • {c.type}</div>
+                        </div>
+                        <div className="w-1/3 text-right shrink-0">
+                          <div className={`text-sm font-bold ${c.status === 'critical' ? 'text-red-500' : 'text-slate-300'}`}>{Math.round(c.wearPercentage)}%</div>
+                          <div className="text-[10px] sm:text-xs text-slate-500">{Math.round(c.distanceSinceInstall)} / {c.lifespan || '∞'} км</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* История (Только чтение) */}
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2"><History className="w-5 h-5 text-indigo-400"/> Бортовой журнал</h2>
+                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 max-h-[500px] overflow-y-auto custom-scrollbar">
+                  {sortedLogs.length === 0 ? (
+                    <div className="text-slate-500 text-sm text-center py-10">Владелец пока не оставил записей</div>
+                  ) : (
+                    <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-800">
+                      {sortedLogs.map(log => (
+                        <div key={log.id} className="relative flex items-start gap-3 md:gap-4">
+                          <div className={`mt-1 flex items-center justify-center w-4 h-4 rounded-full border-4 border-slate-950 shrink-0 shadow z-10 ${log.type === 'maintenance' ? 'bg-lime-500' : 'bg-blue-500'}`}></div>
+                          <div className="flex-1 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-1">
+                              <div className={`font-bold text-xs flex items-center gap-1.5 ${log.type === 'maintenance' ? 'text-lime-400' : 'text-blue-400'}`}>
+                                <Calendar className="w-3 h-3" /> {log.date}
+                              </div>
+                              <span className="text-[10px] text-slate-500 uppercase font-semibold">{log.type === 'maintenance' ? 'Сервис' : 'Заезд'}</span>
+                            </div>
+                            <div className="text-sm text-slate-300 mt-1 whitespace-pre-line">{log.text}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
