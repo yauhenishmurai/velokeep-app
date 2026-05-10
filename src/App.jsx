@@ -3,52 +3,32 @@ import {
   Bike, Settings, Activity, Plus, AlertTriangle, 
   CheckCircle, ChevronRight, Calendar, Search, 
   RefreshCw, Trash2, Loader2, LayoutGrid,
-  History, Globe, Lock, Users, X, Pencil, LogOut
+  History, Globe, Lock, Users, X, Pencil, LogOut, ListPlus
 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 
-// --- ТВЕРДЫЕ КЛЮЧИ FIREBASE ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDRmTQ3sxe_AFyyNpyYb7SIW_wbi-fh_jI",
-  authDomain: "velokeep-cloud.firebaseapp.com",
-  projectId: "velokeep-cloud",
-  storageBucket: "velokeep-cloud.firebasestorage.app",
-  messagingSenderId: "872200307929",
-  appId: "1:872200307929:web:9b3c5ab47e7a767f66eac8",
-  measurementId: "G-JK6NJD5X8B"
-};
+// ==================== FIREBASE ====================
+import { auth, db, googleProvider } from './firebase';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signOut 
+} from 'firebase/auth';
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc 
+} from 'firebase/firestore';
 
-// БАЗА "ЭКСПЕРТ-МЕХАНИК" ДЛЯ АВТОЗАПОЛНЕНИЯ
-const bikeDatabase = {
-  "racer alpina man 1.0": {
-    type: "City/Hybrid", photo: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=800",
-    components: [
-      { category: 'Рама и Вилка', type: 'Рама', name: "Алюминиевая рама", article: "BSA 68mm, 135mm QR", lifespan: 50000 },
-      { category: 'Рама и Вилка', type: 'Вилка', name: "Амортизационная пружинная", article: "1-1/8 straight, 100mm QR", lifespan: 1500 },
-      { category: 'Колеса', type: 'Втулка (пер)', name: "Joytech", article: "Насыпные подшипники, 100mm QR, 6 болтов", lifespan: 5000 },
-      { category: 'Колеса', type: 'Втулка (зад)', name: "Joytech", article: "Насыпные подшипники, 135mm QR, 6 болтов, под трещотку", lifespan: 5000 },
-      { category: 'Колеса', type: 'Покрышка (пер)', name: "Wanda", article: "700x40C", lifespan: 6000 },
-      { category: 'Колеса', type: 'Покрышка (зад)', name: "Wanda", article: "700x40C", lifespan: 3500 },
-      { category: 'Трансмиссия', type: 'Трещотка', name: "Shimano MF-TZ500", article: "7 скоростей, 14-28T", lifespan: 6000 },
-      { category: 'Трансмиссия', type: 'Цепь', name: "KMC Z7", article: "7 скоростей", lifespan: 1500 },
-      { category: 'Трансмиссия', type: 'Система шатунов', name: "Prowheel", article: "42/34/24T, под квадрат", lifespan: 15000 },
-      { category: 'Трансмиссия', type: 'Переключатель (зад)', name: "Shimano Tourney", article: "7 ск, Long cage", lifespan: 8000 },
-      { category: 'Трансмиссия', type: 'Переключатель (пер)', name: "Shimano Tourney", article: "3 ск, 31.8mm clamp", lifespan: 8000 },
-      { category: 'Трансмиссия', type: 'Каретка', name: "Картридж", article: "BSA 68mm, под квадрат", lifespan: 10000 },
-      { category: 'Тормозная система', type: 'Колодки (пер)', name: "ZOOM Дисковые механика", article: "Аналог B01S", lifespan: 1500 },
-      { category: 'Тормозная система', type: 'Колодки (зад)', name: "ZOOM Дисковые механика", article: "Аналог B01S", lifespan: 1500 },
-      { category: 'Управление', type: 'Руль', name: "Стальной Riser", article: "31.8mm", lifespan: 0 },
-      { category: 'Управление', type: 'Подседельный штырь', name: "Алюминий", article: "27.2mm", lifespan: 0 }
-    ]
-  }
-};
+// ==================== НОВЫЕ МОДУЛИ ====================
+import { BIKE_PRESETS, CATEGORIES } from './constants/bikePresets';
+import { migrateOldBikeData, createBikeFromPreset } from './services/bikeService';
+
 
 // ==========================================
 // ГЛАВНЫЙ КОМПОНЕНТ (АВТОРИЗАЦИЯ)
@@ -91,7 +71,10 @@ export default function App() {
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">VeloKeep 2.0</h1>
           <p className="text-slate-400 mb-8">Умный облачный гараж и социальная сеть для велосипедистов.</p>
-          <button onClick={() => signInWithPopup(auth, googleProvider).catch(() => showToast('Ошибка входа', 'error'))} className="w-full py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-3">
+          <button 
+            onClick={() => signInWithPopup(auth, googleProvider).catch(() => showToast('Ошибка входа', 'error'))} 
+            className="w-full py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-3"
+          >
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-6 h-6" />
             Войти через Google
           </button>
@@ -114,7 +97,7 @@ function MainApp({ user, toast, showToast }) {
   const [logs, setLogs] = useState([]);
   const [activeBikeId, setActiveBikeId] = useState(null);
   
-  // Подписка на личные данные (используем плоскую структуру для возможности публичного доступа)
+  // Подписка на личные данные
   useEffect(() => {
     const qBikes = query(collection(db, "bikes"), where("userId", "==", user.uid));
     const unsubBikes = onSnapshot(qBikes, snap => setBikes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -175,16 +158,41 @@ function MainApp({ user, toast, showToast }) {
 
   const handleAddBike = async (newBike, newComponents) => {
     try {
-      const bikeRef = await addDoc(collection(db, "bikes"), { 
-        ...newBike, userId: user.uid, isPublic: false, authorName: user.displayName || 'Аноним'
-      });
-      for (let comp of newComponents) {
-        await addDoc(collection(db, "components"), { ...comp, bikeId: bikeRef.id, userId: user.uid });
-      }
+      const cleanBike = {
+        name: String(newBike.name || 'Мой Велосипед'),
+        model: String(newBike.model || ''),
+        totalMileage: Number(newBike.totalMileage) || 0,
+        photo: String(newBike.photo || ''),
+        userId: String(user.uid),
+        isPublic: false,
+        authorName: String(user.displayName || 'Аноним')
+      };
+
+      const bikeRef = await addDoc(collection(db, "bikes"), cleanBike);
+      
+      await Promise.all(newComponents.map(comp => {
+        const cleanComp = {
+          name: String(comp.name || 'Деталь'),
+          category: String(comp.category || 'Дополнительно'),
+          type: String(comp.type || 'Узел'),
+          article: String(comp.article || ''),
+          installDate: String(comp.installDate),
+          installMileage: Number(comp.installMileage) || 0,
+          lifespan: Number(comp.lifespan) || 0,
+          archived: false,
+          bikeId: String(bikeRef.id),
+          userId: String(user.uid)
+        };
+        return addDoc(collection(db, "components"), cleanComp);
+      }));
+
       setActiveBikeId(bikeRef.id);
       setActiveTab('dashboard');
       showToast('Байк в гараже!');
-    } catch (e) { showToast('Ошибка добавления байка', 'error'); }
+    } catch (e) { 
+      console.error(e);
+      showToast('Ошибка добавления байка или узлов', 'error'); 
+    }
   };
 
   const handleDeleteBike = async (bikeId) => {
@@ -222,12 +230,18 @@ function MainApp({ user, toast, showToast }) {
     try {
       await updateDoc(doc(db, "components", oldComponentId), { archived: true, archiveDate: new Date().toISOString().split('T')[0] });
       await addDoc(collection(db, "components"), {
-        ...oldComp, id: undefined, name: newItemDetails.name || oldComp.name, article: newItemDetails.article !== undefined ? newItemDetails.article : oldComp.article,
-        installDate: new Date().toISOString().split('T')[0], installMileage: activeBike.totalMileage, lifespan: newItemDetails.lifespan || oldComp.lifespan, archived: false
+        ...oldComp, 
+        id: undefined, 
+        name: newItemDetails.name || oldComp.name || 'Деталь', 
+        article: newItemDetails.article !== undefined ? newItemDetails.article : (oldComp.article || ''),
+        installDate: new Date().toISOString().split('T')[0], 
+        installMileage: activeBike.totalMileage || 0, 
+        lifespan: newItemDetails.lifespan || oldComp.lifespan || 0, 
+        archived: false
       });
       await addDoc(collection(db, "logs"), {
         bikeId: activeBike.id, userId: user.uid, date: new Date().toISOString().split('T')[0], type: 'maintenance',
-        text: `Замена "${newItemDetails.name || oldComp.name}" на пробеге ${Math.round(activeBike.totalMileage)} км`, timestamp: Date.now()
+        text: `Замена "${newItemDetails.name || oldComp.name}" на пробеге ${Math.round(activeBike.totalMileage || 0)} км`, timestamp: Date.now()
       });
       showToast('Деталь заменена!');
     } catch (e) { showToast('Ошибка замены', 'error'); }
@@ -237,8 +251,13 @@ function MainApp({ user, toast, showToast }) {
     if (!activeBike) return;
     try {
       await addDoc(collection(db, "components"), {
-        bikeId: activeBike.id, userId: user.uid, name: compData.name, category: compData.category, type: compData.type,
-        article: compData.article || '', installDate: new Date().toISOString().split('T')[0], installMileage: activeBike.totalMileage - (Number(compData.currentWorn) || 0),
+        bikeId: activeBike.id, userId: user.uid, 
+        name: String(compData.name || 'Деталь'), 
+        category: String(compData.category || 'Дополнительно'), 
+        type: String(compData.type || 'Узел'),
+        article: String(compData.article || ''), 
+        installDate: new Date().toISOString().split('T')[0], 
+        installMileage: (activeBike.totalMileage || 0) - (Number(compData.currentWorn) || 0),
         lifespan: Number(compData.lifespan) || 0, archived: false
       });
       showToast('Деталь добавлена');
@@ -257,18 +276,18 @@ function MainApp({ user, toast, showToast }) {
 
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-md">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-lime-400">
+          <div className="flex items-center gap-2 text-lime-400 shrink-0">
             <Activity className="w-6 h-6" />
             <span className="text-xl font-bold tracking-tight hidden sm:block">VeloKeep 2.0</span>
           </div>
-          <nav className="flex gap-1 md:gap-2 overflow-x-auto no-scrollbar">
+          <nav className="flex gap-1 md:gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 flex-1 sm:flex-initial">
             <NavBtn active={activeTab === 'garage'} onClick={() => setActiveTab('garage')} icon={<LayoutGrid />} label="Гараж" />
             <NavBtn active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Bike />} label="Дашборд" />
             <NavBtn active={activeTab === 'details'} onClick={() => setActiveTab('details')} icon={<Settings />} label="Узлы" />
-            <div className="w-px h-6 bg-slate-800 self-center mx-1 md:mx-2"></div>
+            <div className="w-px h-6 bg-slate-800 self-center mx-1 md:mx-2 shrink-0"></div>
             <NavBtn active={activeTab === 'public'} onClick={() => setActiveTab('public')} icon={<Users className="text-indigo-400" />} label="Парковка" />
           </nav>
-          <button onClick={() => signOut(auth)} className="p-2 ml-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors" title="Выйти">
+          <button onClick={() => signOut(auth)} className="p-2 ml-1 md:ml-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors shrink-0" title="Выйти">
             <LogOut className="w-5 h-5" />
           </button>
         </div>
@@ -296,7 +315,7 @@ function MainApp({ user, toast, showToast }) {
 }
 
 // ==========================================
-// ОБЩЕСТВЕННАЯ ПАРКОВКА (ВОЗВРАЩЕНО)
+// ОБЩЕСТВЕННАЯ ПАРКОВКА 
 // ==========================================
 function PublicParkingTab({ currentUserId }) {
   const [publicBikes, setPublicBikes] = useState([]);
@@ -468,8 +487,9 @@ function DashboardTab({ bike, alerts, components, logs, onAddRide, onGoToDetails
   };
 
   const groupedComponents = components.reduce((acc, comp) => {
-    if (!acc[comp.category]) acc[comp.category] = [];
-    acc[comp.category].push(comp);
+    const category = comp.category || 'Без категории';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(comp);
     return acc;
   }, {});
 
@@ -484,12 +504,24 @@ function DashboardTab({ bike, alerts, components, logs, onAddRide, onGoToDetails
             <p className="text-slate-300 text-sm">{bike.model} • Пробег: <span className="text-lime-400 font-bold">{Math.round(bike.totalMileage || 0)} км</span></p>
           </div>
         </div>
-        <div className="p-4 bg-slate-900 flex justify-end">
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 bg-lime-500 hover:bg-lime-400 text-slate-950 px-5 py-2.5 rounded-xl font-bold transition-colors">
-            <Plus className="w-5 h-5" /> Добавить заезд
-          </button>
-        </div>
-      </div>
+<div className="p-4 bg-slate-900 flex justify-end gap-3">
+  {/* Наша временная кнопка для теста миграции */}
+  <button 
+    onClick={() => {
+      migrateOldBikeData(bike.userId, bike)
+        .then(() => alert("✅ Миграция завершена! Проверь консоль Firebase."))
+        .catch(e => alert("❌ Ошибка: " + e.message));
+    }} 
+    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
+  >
+    ⚙️ Миграция V3
+  </button>
+
+  {/* Твоя старая кнопка добавления заезда */}
+  <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 bg-lime-500 hover:bg-lime-400 text-slate-950 px-5 py-2.5 rounded-xl font-bold transition-colors">
+    <Plus className="w-5 h-5" /> Добавить заезд
+  </button>
+</div>      </div>
 
       {alerts.length > 0 && (
         <div className="space-y-3">
@@ -517,25 +549,37 @@ function DashboardTab({ bike, alerts, components, logs, onAddRide, onGoToDetails
             <h2 className="text-lg font-bold text-white">Состояние узлов</h2>
             <button onClick={onGoToDetails} className="text-sm text-lime-400 hover:text-lime-300 font-semibold">Настройки &rarr;</button>
           </div>
-          {Object.entries(groupedComponents).map(([category, items]) => (
-            <div key={category} className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-              <div className="bg-slate-800/50 px-4 py-2 border-b border-slate-800"><h3 className="text-xs font-bold text-lime-400 uppercase tracking-wider">{category}</h3></div>
-              <div className="divide-y divide-slate-800/50">
-                {items.filter(c => c.lifespan > 0).map(comp => (
-                  <div key={comp.id} className="p-4 flex justify-between items-center gap-3">
-                    <div className="flex-1">
-                      <div className="font-semibold text-slate-200 text-sm">{comp.name}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{comp.type}</div>
-                    </div>
-                    <div className="w-1/3 space-y-1.5">
-                      <div className="flex justify-between text-[10px] font-mono"><span className="text-slate-400">{Math.round(comp.distanceSinceInstall)} / {comp.lifespan}</span><span className={comp.status === 'critical' ? 'text-red-400 font-bold' : 'text-slate-400'}>{Math.round(comp.wearPercentage)}%</span></div>
-                      <WearProgressBar wear={comp.wearPercentage} status={comp.status} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+          
+          {Object.keys(groupedComponents).length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+              <Settings className="w-12 h-12 text-slate-700 mx-auto mb-3" />
+              <h3 className="text-white font-bold mb-1">Нет добавленных узлов</h3>
+              <p className="text-slate-400 text-sm mb-5">Детали для отслеживания износа отсутствуют.</p>
+              <button onClick={onGoToDetails} className="bg-slate-800 hover:bg-slate-700 text-lime-400 px-5 py-2.5 rounded-xl text-sm font-bold transition-colors">
+                Перейти к добавлению
+              </button>
             </div>
-          ))}
+          ) : (
+            Object.entries(groupedComponents).map(([category, items]) => (
+              <div key={category} className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+                <div className="bg-slate-800/50 px-4 py-2 border-b border-slate-800"><h3 className="text-xs font-bold text-lime-400 uppercase tracking-wider">{category}</h3></div>
+                <div className="divide-y divide-slate-800/50">
+                  {items.filter(c => c.lifespan > 0).map(comp => (
+                    <div key={comp.id} className="p-4 flex justify-between items-center gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-200 text-sm">{comp.name || 'Деталь'}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{comp.type || 'Узел'}</div>
+                      </div>
+                      <div className="w-1/3 space-y-1.5">
+                        <div className="flex justify-between text-[10px] font-mono"><span className="text-slate-400">{Math.round(comp.distanceSinceInstall || 0)} / {comp.lifespan}</span><span className={comp.status === 'critical' ? 'text-red-400 font-bold' : 'text-slate-400'}>{Math.round(comp.wearPercentage)}%</span></div>
+                        <WearProgressBar wear={comp.wearPercentage} status={comp.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="space-y-4">
@@ -581,7 +625,7 @@ function DashboardTab({ bike, alerts, components, logs, onAddRide, onGoToDetails
 }
 
 // ==========================================
-// НАСТРОЙКА УЗЛОВ (С КНОПКАМИ РЕДАКТИРОВАНИЯ И GOOGLE SEARCH)
+// НАСТРОЙКА УЗЛОВ 
 // ==========================================
 function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
   const [showAddNewModal, setShowAddNewModal] = useState(false);
@@ -592,15 +636,16 @@ function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
   const [replaceArticle, setReplaceArticle] = useState('');
 
   const grouped = components.reduce((acc, comp) => {
-    if (!acc[comp.category]) acc[comp.category] = [];
-    acc[comp.category].push(comp);
+    const category = comp.category || 'Без категории';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(comp);
     return acc;
   }, {});
 
   const handleDirectReplace = (comp) => {
     setCompToReplace(comp);
-    setReplaceName(comp.name);
-    setReplaceLifespan(comp.lifespan);
+    setReplaceName(comp.name || '');
+    setReplaceLifespan(comp.lifespan || '');
     setReplaceArticle(comp.article || '');
   };
 
@@ -628,16 +673,16 @@ function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
                 {items.map(comp => (
                   <div key={comp.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-slate-800/30 transition-colors group">
                     <div className="flex-1">
-                      <div className="font-bold text-slate-200 text-base">{comp.name}</div>
+                      <div className="font-bold text-slate-200 text-base">{comp.name || 'Деталь'}</div>
                       {comp.article && <div className="text-xs text-indigo-400 font-mono mt-0.5">{comp.article}</div>}
-                      <div className="text-xs text-slate-500 mt-1">{comp.type}</div>
+                      <div className="text-xs text-slate-500 mt-1">{comp.type || 'Узел'}</div>
                     </div>
 
                     <div className="w-full sm:w-1/3 md:w-1/4">
                        {comp.lifespan > 0 ? (
                          <>
                            <div className="flex justify-between text-xs font-mono text-slate-300 mb-1">
-                             <span>{Math.round(comp.distanceSinceInstall)} / {comp.lifespan} км</span>
+                             <span>{Math.round(comp.distanceSinceInstall || 0)} / {comp.lifespan} км</span>
                              <span className={comp.status === 'critical' ? 'text-red-400 font-bold' : ''}>{Math.round(comp.wearPercentage)}%</span>
                            </div>
                            <WearProgressBar wear={comp.wearPercentage} status={comp.status} size="sm" />
@@ -649,7 +694,7 @@ function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
                     <div className="flex items-center justify-end gap-2 shrink-0 mt-2 sm:mt-0">
                       {/* Поиск в Google */}
                       <a 
-                        href={`https://www.google.com/search?q=${encodeURIComponent(comp.name + " " + comp.type + " купить")}`}
+                        href={`https://www.google.com/search?q=${encodeURIComponent((comp.name || '') + " " + (comp.type || '') + " купить")}`}
                         target="_blank" rel="noopener noreferrer"
                         className="p-2 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg transition-colors" title="Искать деталь в Google"
                       >
@@ -671,6 +716,11 @@ function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
              </div>
           </div>
         ))}
+        {Object.keys(grouped).length === 0 && (
+           <div className="text-center text-slate-500 py-10 border border-dashed border-slate-800 rounded-xl bg-slate-900/50">
+              Список узлов пуст. Нажмите «Добавить узел».
+           </div>
+        )}
       </div>
 
       {showAddNewModal && <AddNewComponentModal onClose={() => setShowAddNewModal(false)} onAdd={onAddNew} />}
@@ -698,9 +748,9 @@ function ComponentsTab({ components, onReplace, onAddNew, onEdit }) {
 }
 
 function EditComponentModal({ component, onClose, onSave }) {
-  const [name, setName] = useState(component.name);
+  const [name, setName] = useState(component.name || '');
   const [article, setArticle] = useState(component.article || '');
-  const [lifespan, setLifespan] = useState(component.lifespan);
+  const [lifespan, setLifespan] = useState(component.lifespan || 0);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -902,5 +952,6 @@ function NavBtn({ active, onClick, icon, label }) {
 }
 function WearProgressBar({ wear, status, size = "md" }) {
   const color = status === 'critical' ? 'bg-red-500' : status === 'warning' ? 'bg-orange-500' : 'bg-green-500';
-  return <div className={`w-full bg-slate-800 rounded-full overflow-hidden ${size === 'sm' ? 'h-1.5' : 'h-2'}`}><div className={`${color} h-full transition-all duration-1000`} style={{ width: `${Math.min(100, Math.max(2, wear))}%` }} /></div>;
+  const validWear = Number.isNaN(Number(wear)) ? 0 : Math.min(100, Math.max(2, Number(wear)));
+  return <div className={`w-full bg-slate-800 rounded-full overflow-hidden ${size === 'sm' ? 'h-1.5' : 'h-2'}`}><div className={`${color} h-full transition-all duration-1000`} style={{ width: `${validWear}%` }} /></div>;
 }
